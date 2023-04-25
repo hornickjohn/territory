@@ -1,0 +1,35 @@
+:root {
+    --maxwidth:480px;
+
+}
+
+#gamearea table {
+    width:var(--maxwidth);
+    height:var(--maxwidth);
+    border-collapse:collapse;
+    table-layout:fixed;
+}
+#gamearea td {
+    border:3px solid black;
+    text-align:center;
+}
+
+.player0cell {
+    background-color:gray;
+}
+.player1cell {
+    background-color:blue;
+}
+.player2cell {
+    background-color:red;
+}
+.player3cell {
+    background-color:green;
+}
+.player4cell {
+    background-color:yellow;
+}
+
+.selected {
+    filter:brightness(200%);
+}
