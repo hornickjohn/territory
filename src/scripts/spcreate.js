@@ -1,6 +1,8 @@
+//TODO: when a territory changes, check it against currently selected cell to see if we need to handle that weird situation
+
 const playerNum = 1;
 
-const playerLands = [0,0,0,0,0];
+const playerCells = [[],[],[],[],[]];
 
 let gameRunning = false;
 let spawnTimer;
@@ -20,10 +22,14 @@ class Cell {
         this.y = y;
         this.spawnRate = 5;
 
+        this.outer = false;
+
+        this.neighbors = [];
+
         this.units = 0;
         this.domCell.onclick = e => {
             if(!gameRunning) { return; }
-            
+
             //run block if we are clicking a cell while already having selected one
             if(selectingCell) {
                 //if clicking the same one as selected, stop selecting
@@ -60,46 +66,23 @@ class Cell {
             }
 
             //set cells that can be attacked to left/right/up/down cells that are a different player than this one
-            if(grid[this.x+1] && grid[this.x+1][this.y] && grid[this.x+1][this.y].controllingPlayer != this.controllingPlayer) { 
-                grid[this.x+1][this.y].domCell.classList.add('attackable');
-                attackableCells.push(grid[this.x+1][this.y]); 
-            }
-            if(grid[this.x-1] && grid[this.x-1][this.y] && grid[this.x-1][this.y].controllingPlayer != this.controllingPlayer) {
-                grid[this.x-1][this.y].domCell.classList.add('attackable');
-                attackableCells.push(grid[this.x-1][this.y]);
-            }
-            if(grid[this.x][this.y+1] && grid[this.x][this.y+1].controllingPlayer != this.controllingPlayer) {
-                grid[this.x][this.y+1].domCell.classList.add('attackable');
-                attackableCells.push(grid[this.x][this.y+1]);
-            }
-            if(grid[this.x][this.y-1] && grid[this.x][this.y-1].controllingPlayer != this.controllingPlayer) {
-                grid[this.x][this.y-1].domCell.classList.add('attackable');
-                attackableCells.push(grid[this.x][this.y-1]);
-            }
+            this.neighbors.forEach(neighbor => {
+                if(neighbor.controllingPlayer != this.controllingPlayer) {
+                    neighbor.domCell.classList.add('attackable');
+                    attackableCells.push(neighbor);
+                }
+            });
 
             //recursive function to crawl from current spot to find all ATTACHED friendly cells
             const addConnectedNeighbors = (X,Y) => {
                 //for each direction, if that cell exists AND is friendly AND is not already in movableCells, add it AND its neighbors
-                if(grid[X+1] && grid[X+1][Y] && grid[X+1][Y].controllingPlayer == this.controllingPlayer && !movableCells.includes(grid[X+1][Y])) {
-                    grid[X+1][Y].domCell.classList.add('movable');
-                    movableCells.push(grid[X+1][Y]);
-                    addConnectedNeighbors(X+1,Y);
-                }
-                if(grid[X-1] && grid[X-1][Y] && grid[X-1][Y].controllingPlayer == this.controllingPlayer && !movableCells.includes(grid[X-1][Y])) {
-                    grid[X-1][Y].domCell.classList.add('movable');
-                    movableCells.push(grid[X-1][Y]);
-                    addConnectedNeighbors(X-1,Y);
-                }
-                if(grid[X][Y+1] && grid[X][Y+1].controllingPlayer == this.controllingPlayer && !movableCells.includes(grid[X][Y+1])) {
-                    movableCells.push(grid[X][Y+1]);
-                    grid[X][Y+1].domCell.classList.add('movable');
-                    addConnectedNeighbors(X,Y+1);
-                }
-                if(grid[X][Y-1] && grid[X][Y-1].controllingPlayer == this.controllingPlayer && !movableCells.includes(grid[X][Y-1])) {
-                    grid[X][Y-1].domCell.classList.add('movable');
-                    movableCells.push(grid[X][Y-1]);
-                    addConnectedNeighbors(X,Y-1);
-                }
+                grid[X][Y].neighbors.forEach(neighbor => {
+                    if(neighbor.controllingPlayer === this.controllingPlayer && !movableCells.includes(neighbor)) {
+                        neighbor.domCell.classList.add('movable');
+                        movableCells.push(neighbor);
+                        addConnectedNeighbors(neighbor.x,neighbor.y);
+                    }
+                });
             };
 
             //call recursive crawl starting at this spot
@@ -107,10 +90,26 @@ class Cell {
 
             //find this cell in movableCells and remove it - it should have been added in recursion unless there are no connections
             const ind = movableCells.indexOf(this);
+            this.domCell.classList.remove('movable');
             if(ind >= 0) { movableCells.splice(ind,1); }
         };
+    }
 
-        //domCell.style.backgroundColor = 'black';  
+    initializeNeighbors() {
+        this.neighbors = [];
+        if(grid[this.x+1] && grid[this.x+1][this.y]) { this.neighbors.push(grid[this.x+1][this.y]); }
+        if(grid[this.x-1] && grid[this.x-1][this.y]) { this.neighbors.push(grid[this.x-1][this.y]); }
+        if(grid[this.x][this.y+1]) { this.neighbors.push(grid[this.x][this.y+1]); }
+        if(grid[this.x][this.y-1]) { this.neighbors.push(grid[this.x][this.y-1]); }
+    }
+
+    updateOuterness() {
+        this.outer = false;
+        this.neighbors.forEach(neighbor => {
+            if(neighbor.controllingPlayer != this.controllingPlayer) {
+                this.outer = true;
+            }
+        });
     }
 
     spawn() {
@@ -127,18 +126,23 @@ class Cell {
         this.domCell.classList.remove('player3cell');
         this.domCell.classList.remove('player4cell');
 
-        playerLands[this.controllingPlayer]--;
-        playerLands[num]++;
-        console.log(playerLands);
+        //move this from one players cell array to the other
+        if(playerCells[this.controllingPlayer]) {
+            let ind = playerCells[this.controllingPlayer].indexOf(this);
+            if(ind >= 0) { playerCells[this.controllingPlayer].splice(ind,1); }
+        }
+        playerCells[num].push(this);
 
         this.controllingPlayer = num;
         this.domCell.classList.add('player' + num + 'cell');
 
+        //IF game is running, check if game is over and update outerness
         if(gameRunning) {
+            //check number of living players to see if game is over
             let livingPlayers = 0;
             let lastPlayer = 0;
-            for(let i = 1; i < playerLands.length; i++) {
-                if(playerLands[i] > 0) {
+            for(let i = 1; i < playerCells.length; i++) {
+                if(playerCells[i].length > 0) {
                     ++livingPlayers;
                     lastPlayer = i;
                 }
@@ -146,9 +150,17 @@ class Cell {
             if(livingPlayers === 0) {
                 console.log('No players alive?!?');
                 EndGame();
+                return;
             } else if(livingPlayers === 1) {
                 EndGame(lastPlayer);
+                return;
             }
+
+            //update outerness of this cell and its neighbors
+            this.updateOuterness();
+            this.neighbors.forEach(neighbor => {
+                neighbor.updateOuterness();
+            });
         }
     }
 
@@ -212,6 +224,7 @@ document.querySelector('#gamearea').appendChild(table);
 
 grid.forEach(arr => {
     arr.forEach(cell => {
+        cell.initializeNeighbors();
         cell.addUnits(Math.ceil(Math.random() * 100));
     });
 });
@@ -230,6 +243,20 @@ grid[0][dimension-1].setToPlayer(pnums[1]);
 grid[dimension-1][0].setToPlayer(pnums[2]);
 grid[0][0].setToPlayer(pnums[3]);
 
+//set initial outerness of spawn points and their neighbors
+grid[dimension-1][dimension-1].outer = true;
+grid[dimension-2][dimension-1].outer = true;
+grid[dimension-1][dimension-2].outer = true;
+grid[0][dimension-1].outer = true;
+grid[1][dimension-1].outer = true;
+grid[0][dimension-2].outer = true;
+grid[dimension-1][0].outer = true;
+grid[dimension-2][0].outer = true;
+grid[dimension-1][1].outer = true;
+grid[0][0].outer = true;
+grid[1][0].outer = true;
+grid[0][1].outer = true;
+
 //spawn timer for new units
 spawnTimer = setInterval(()=>{
     grid.forEach(row => {
@@ -243,8 +270,65 @@ spawnTimer = setInterval(()=>{
 
 //AI logic on a timer
 AITimer = setInterval(()=>{
+    //for each player that isn't ours, go through all OUTER cells and store all possible attacks and which needs reinforcements the most
+    for(let plyr = 1; plyr < playerCells.length; plyr++) {
+        const possiblePlayerAttacks = [];
+        const possibleNeutralAttacks = [];
+        let mostNeededTroops = { found:false, againstPlayer:false, num:0, x:-1, y:-1 };
 
-},5000);
+        if(plyr !== playerNum) {
+            for(let i = 0; i < playerCells[plyr].length; i++) {
+                const currentCell = playerCells[plyr][i];
+                if(currentCell.outer) {
+                    currentCell.neighbors.forEach(neighbor => {
+                        if(neighbor.controllingPlayer !== currentCell.controllingPlayer && neighbor.controllingPlayer !== 0) {
+                            //this neighbor is an enemy player
+                            if(neighbor.units < currentCell.units) {
+                                possiblePlayerAttacks.push({ myX:currentCell.x, myY:currentCell.y, theirX:neighbor.x, theirY:neighbor.y });
+                            } else {
+                                if(!mostNeededTroops.found || (!mostNeededTroops.againstPlayer || mostNeededTroops.num < neighbor.units - currentCell.units)) {
+                                    mostNeededTroops = { found:true, againstPlayer:true, num:neighbor.units - currentCell.units, x:currentCell.x, y:currentCell.y };
+                                }
+                            }
+                        } else if(neighbor.controllingPlayer !== currentCell.controllingPlayer) {
+                            //this neighbor is neutral
+                            if(neighbor.units < currentCell.units) {
+                                possibleNeutralAttacks.push({ myX:currentCell.x, myY:currentCell.y, theirX:neighbor.x, theirY:neighbor.y });
+                            } else {
+                                if(!mostNeededTroops.found || (!mostNeededTroops.againstPlayer && mostNeededTroops.num < neighbor.units - currentCell.units)) { 
+                                    mostNeededTroops = { found:true, againstPlayer:false, num:neighbor.units - currentCell.units, x:currentCell.x, y:currentCell.y };
+                                }
+                            }
+                        }
+                    });
+                }
+            }
+
+            if(possiblePlayerAttacks.length > 0) {
+                let attack = possiblePlayerAttacks[Math.floor(Math.random() * possiblePlayerAttacks.length)];
+                grid[attack.theirX][attack.theirY].getAttacked(grid[attack.myX][attack.myY]);
+            } else if(possibleNeutralAttacks.length > 0) {
+                let attack = possibleNeutralAttacks[Math.floor(Math.random() * possiblePlayerAttacks.length)];
+                grid[attack.theirX][attack.theirY].getAttacked(grid[attack.myX][attack.myY]);
+            } else if(mostNeededTroops.found) {
+                let index = -1;
+                let max = -1;
+                for(let i = 0; i < playerCells[plyr].length; i++) {
+                    if(!playerCells[plyr][i].outer) {
+                        let count = playerCells[plyr][i].units;
+                        if(count > max) {
+                            max = count;
+                            index = i;
+                        }
+                    }
+                }
+                if(index >= 0) {
+                    grid[mostNeededTroops.x][mostNeededTroops.y].getUnitsFrom(playerCells[plyr][index], Math.ceil(playerCells[plyr][index].units / 2));
+                }
+            }
+        }
+    }
+},2000);
 
 gameRunning = true;
 

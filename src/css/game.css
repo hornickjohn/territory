@@ -33,3 +33,18 @@
 .selected {
     filter:brightness(200%);
 }
+
+.movable {
+    filter:brightness(120%);
+}
+.attackable {
+    filter:brightness(120%);
+}
+.movable:hover {
+    filter:brightness(160%);
+    cursor:move;
+}
+.attackable:hover {
+    filter:brightness(160%);
+    cursor:crosshair;
+}
