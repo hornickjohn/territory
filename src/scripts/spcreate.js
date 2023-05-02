@@ -1,15 +1,141 @@
-//TODO: when a territory changes, check it against currently selected cell to see if we need to handle that weird situation
+class Player {
+    //difficulty is "player" "neutral" or easy/medium/hard
+    constructor(num, difficulty, startingCell, startingUnits) {
+        this.num = num;
+        this.difficulty = difficulty;
+        this.startingCell = startingCell;
+        this.startingUnits = startingUnits;
+    }
 
-const playerNum = 1;
+    //set home base cell up after grid is initialized
+    setup() {
+        if(!grid.length) {
+            console.log('Attempted to initialize a player while grid is empty.');
+            return;
+        } else if(this.difficulty === "neutral") {
+            return;
+        }
 
-const playerCells = [[],[],[],[],[]];
+        grid[this.startingCell.x][this.startingCell.y].setToPlayer(this.num);
+        grid[this.startingCell.x][this.startingCell.y].units = 0;
+        grid[this.startingCell.x][this.startingCell.y].addUnits(this.startingUnits);
+
+        grid[this.startingCell.x][this.startingCell.y].outer = true;
+        grid[this.startingCell.x][this.startingCell.y].neighbors.forEach(neighbor => {
+            neighbor.outer = true;
+        });
+    }
+
+    //returns a newly set interval containing AI logic based on difficulty
+    getAILogic() {
+        if(this.difficulty === "hard") {
+            return null;
+        } else if(this.difficulty === "medium") {
+            return null;
+        } else if(this.difficulty === "easy") {
+            return setInterval(()=>{
+                //immediately abort each iteration if player is already dead - TODO if we end up disposing the timer entirely, then this check doesn't need to be present
+                if(playerCells[this.num].length == 0) { return; }
+
+                const possiblePlayerAttacks = [];
+                const possibleNeutralAttacks = [];
+                let mostNeededTroops = { found:false, againstPlayer:false, num:0, x:-1, y:-1 };
+
+                //go through all OUTER cells and store all possible attacks and which needs reinforcements the most
+                for(let i = 0; i < playerCells[this.num].length; i++) {
+                    const currentCell = playerCells[this.num][i];
+                    if(currentCell.outer) {
+                        currentCell.neighbors.forEach(neighbor => {
+                            if(neighbor.controllingPlayer !== currentCell.controllingPlayer && neighbor.controllingPlayer !== 0) {
+                                //this neighbor is an enemy player
+                                if(neighbor.units < currentCell.units) {
+                                    possiblePlayerAttacks.push({ myX:currentCell.x, myY:currentCell.y, theirX:neighbor.x, theirY:neighbor.y });
+                                } else {
+                                    if(!mostNeededTroops.found || (!mostNeededTroops.againstPlayer || mostNeededTroops.num < neighbor.units - currentCell.units)) {
+                                        mostNeededTroops = { found:true, againstPlayer:true, num:neighbor.units - currentCell.units, x:currentCell.x, y:currentCell.y };
+                                    }
+                                }
+                            } else if(neighbor.controllingPlayer !== currentCell.controllingPlayer) {
+                                //this neighbor is neutral
+                                if(neighbor.units < currentCell.units) {
+                                    possibleNeutralAttacks.push({ myX:currentCell.x, myY:currentCell.y, theirX:neighbor.x, theirY:neighbor.y });
+                                } else {
+                                    if(!mostNeededTroops.found || (!mostNeededTroops.againstPlayer && mostNeededTroops.num < neighbor.units - currentCell.units)) { 
+                                        mostNeededTroops = { found:true, againstPlayer:false, num:neighbor.units - currentCell.units, x:currentCell.x, y:currentCell.y };
+                                    }
+                                }
+                            }
+                        });
+                    }
+                }
+
+                //do player attack if there is one, neutral attack, or if none move some troops from an inner cell
+                if(possiblePlayerAttacks.length > 0) {
+                    let attack = possiblePlayerAttacks[Math.floor(Math.random() * possiblePlayerAttacks.length)];
+                    grid[attack.theirX][attack.theirY].getAttacked(grid[attack.myX][attack.myY]);
+                } else if(possibleNeutralAttacks.length > 0) {
+                    let attack = possibleNeutralAttacks[Math.floor(Math.random() * possiblePlayerAttacks.length)];
+                    grid[attack.theirX][attack.theirY].getAttacked(grid[attack.myX][attack.myY]);
+                } else if(mostNeededTroops.found) {
+                    let index = -1;
+                    let max = -1;
+                    for(let i = 0; i < playerCells[this.num].length; i++) {
+                        if(!playerCells[this.num][i].outer) {
+                            let count = playerCells[this.num][i].units;
+                            if(count > max) {
+                                max = count;
+                                index = i;
+                            }
+                        }
+                    }
+                    if(index >= 0) {
+                        grid[mostNeededTroops.x][mostNeededTroops.y].getUnitsFrom(playerCells[this.num][index], Math.ceil(playerCells[this.num][index].units / 2));
+                    }
+                }
+                
+            },1500 + Math.floor(Math.random() * 1000));
+        } else {
+            return null;
+        }
+    }
+}
+
+//TODO return this to constant, leaving as let for easy changing of player control in console while testing
+let playerNum = 1;
 
 let gameRunning = false;
 let spawnTimer;
-let AITimer;
+let AITimers = [];
+let grid = [];
 
 const maxPerCell = 999;
-const dimension = 6;
+const dimension = 7;
+let startingCells = [{x:0,y:0},{x:dimension-1,y:0},{x:0,y:dimension-1},{x:dimension-1,y:dimension-1}];
+const randomizeStartingLocations = true;
+const startingUnits = 30;
+const initialSpawnRanges = [{min:10,max:40},{min:20,max:50},{min:30,max:80},{min:50,max:125},{min:75,max:150},{min:100,max:250}]; //longest range is theoretically d-2 for d is even, d-1 for d is odd
+const symmetry = true;
+
+//create player objects based on info
+if(randomizeStartingLocations) { ShuffleStartingCells(); }
+function ShuffleStartingCells() {
+    let rv = [];
+    while(startingCells.length > 0) {
+        const ind = Math.floor(Math.random() * startingCells.length);
+        rv.push(startingCells[ind]);
+        startingCells.splice(ind, 1);
+    }
+    startingCells = rv;
+}
+const players = [new Player(0, "neutral", null, null)];
+players.push(new Player(1, "player", startingCells[0], startingUnits));
+for(let i = 1; i < startingCells.length; i++) {
+    players.push(new Player(i+1, "easy", startingCells[i], startingUnits));
+};
+
+const playerCells = [[]];
+for(let i = 0; i < startingCells.length; i++) { playerCells.push([]); }
+
 let selectingCell = null;
 let attackableCells = [];
 let movableCells = [];
@@ -39,12 +165,12 @@ class Cell {
                 }
 
                 //if targeting an attackable cell, resolve attack
-                if(attackableCells.includes(this)) {
+                if(attackableCells.includes(this) && selectingCell.controllingPlayer !== this.controllingPlayer) {
                     this.getAttacked(selectingCell);
                 }
 
                 //handle move units
-                if(movableCells.includes(this)) {
+                if(movableCells.includes(this) && selectingCell.controllingPlayer === this.controllingPlayer) {
                     let moveUnits = Math.ceil(selectingCell.units / 2);
                     this.getUnitsFrom(selectingCell, moveUnits);
                 }
@@ -118,6 +244,11 @@ class Cell {
 
     setToPlayer(num) {
         if(num < 0 || num > 4 || this.controllingPlayer === num) { return; }
+
+        //if we are currently selecting this cell we need to deselect it
+        if(selectingCell == this) {
+            StopSelecting();
+        }
 
         //clear any other player number class that might be set
         this.domCell.classList.remove('player0cell');
@@ -204,133 +335,132 @@ class Cell {
     }
 }
 
-//Right click anywhere on page leaves selecting mode
-document.querySelector('body').onclick += e => { StopSelecting(); }
+//loads grid and starts game
+function StartGame() {
+    //Click anywhere on page leaves selecting mode
+    document.querySelector('body').onclick += e => { StopSelecting(); }
 
-const grid = [];
-for(let i = 0; i < dimension; i++) { grid.push([]); }
+    grid = [];
+    for(let i = 0; i < dimension; i++) { grid.push([]); }
 
-const table = document.createElement('table');
-for(let i = 0; i < dimension; i++) {
-    const row = document.createElement('tr');
-    for(let j = 0; j < dimension; j++) {
-        const cell = document.createElement('td');
-        grid[j].push(new Cell(cell, 0, j, i));
-        row.appendChild(cell);
+    const table = document.createElement('table');
+    for(let i = 0; i < dimension; i++) {
+        const row = document.createElement('tr');
+        for(let j = 0; j < dimension; j++) {
+            const cell = document.createElement('td');
+            grid[j].push(new Cell(cell, 0, j, i));
+            row.appendChild(cell);
+        }
+        table.appendChild(row);
     }
-    table.appendChild(row);
-}
-document.querySelector('#gamearea').appendChild(table);
+    document.querySelector('#gamearea').appendChild(table);
 
-grid.forEach(arr => {
-    arr.forEach(cell => {
-        cell.initializeNeighbors();
-        cell.addUnits(Math.ceil(Math.random() * 100));
-    });
-});
+    //go through grid and initialize neighbors + spawn units
+    grid.forEach(arr => {
+        arr.forEach(cell => {
+            cell.initializeNeighbors();
 
-//randomize corners to each player
-const pnums = [];
-for(let i = 1; i <= 4; i++) {
-    let rn = Math.ceil(Math.random() * 4);
-    while(pnums.includes(rn)) {
-        rn = Math.ceil(Math.random() * 4);
-    }
-    pnums.push(rn);
-}
-grid[dimension-1][dimension-1].setToPlayer(pnums[0]);
-grid[0][dimension-1].setToPlayer(pnums[1]);
-grid[dimension-1][0].setToPlayer(pnums[2]);
-grid[0][0].setToPlayer(pnums[3]);
+            //this may have already been assigned by a symmetry assignment - in that case, bail
+            if(cell.units > 0) {
+                return;
+            }
 
-//set initial outerness of spawn points and their neighbors
-grid[dimension-1][dimension-1].outer = true;
-grid[dimension-2][dimension-1].outer = true;
-grid[dimension-1][dimension-2].outer = true;
-grid[0][dimension-1].outer = true;
-grid[1][dimension-1].outer = true;
-grid[0][dimension-2].outer = true;
-grid[dimension-1][0].outer = true;
-grid[dimension-2][0].outer = true;
-grid[dimension-1][1].outer = true;
-grid[0][0].outer = true;
-grid[1][0].outer = true;
-grid[0][1].outer = true;
+            //figure out distance to nearest player cell
+            let minDist = initialSpawnRanges.length;
+            players.forEach(player => {
+                if(player.difficulty !== "neutral") {
+                    const dist = Math.abs(player.startingCell.x - cell.x) + Math.abs(player.startingCell.y - cell.y);
+                    if(dist < minDist) { minDist = dist; }
+                }
+            });
 
-//spawn timer for new units
-spawnTimer = setInterval(()=>{
-    grid.forEach(row => {
-        row.forEach(cell => {
-            if(cell.controllingPlayer !== 0) {
-                cell.spawn();
+            //initialize neutrals based on that
+            if(minDist > 0) {
+                const range = initialSpawnRanges[minDist - 1];
+                cell.units = 0;
+                cell.addUnits(range.min + Math.floor(Math.random() * ((range.max - range.min) + 1)));
+            }
+
+            //mirror the number if symmetry
+            if(symmetry && minDist > 0) {
+                const X1 = dimension - (cell.x + 1);
+                const Y1 = dimension - (cell.y + 1);
+                const X2 = dimension - (cell.y + 1);
+                const Y2 = cell.x;
+                const X3 = dimension - (X2 + 1);
+                const Y3 = dimension - (Y2 + 1);
+                if(X1 != cell.x || Y1 != cell.y) {
+                    grid[X1][Y1].units = 0;
+                    grid[X1][Y1].addUnits(cell.units);
+                    grid[X2][Y2].units = 0;
+                    grid[X2][Y2].addUnits(cell.units);
+                    grid[X3][Y3].units = 0;
+                    grid[X3][Y3].addUnits(cell.units);
+                }
             }
         });
     });
-},5000);
 
-//AI logic on a timer
-AITimer = setInterval(()=>{
-    //for each player that isn't ours, go through all OUTER cells and store all possible attacks and which needs reinforcements the most
-    for(let plyr = 1; plyr < playerCells.length; plyr++) {
-        const possiblePlayerAttacks = [];
-        const possibleNeutralAttacks = [];
-        let mostNeededTroops = { found:false, againstPlayer:false, num:0, x:-1, y:-1 };
+    //initialize player starts
+    players.forEach(player => {
+        player.setup();
+    });
 
-        if(plyr !== playerNum) {
-            for(let i = 0; i < playerCells[plyr].length; i++) {
-                const currentCell = playerCells[plyr][i];
-                if(currentCell.outer) {
-                    currentCell.neighbors.forEach(neighbor => {
-                        if(neighbor.controllingPlayer !== currentCell.controllingPlayer && neighbor.controllingPlayer !== 0) {
-                            //this neighbor is an enemy player
-                            if(neighbor.units < currentCell.units) {
-                                possiblePlayerAttacks.push({ myX:currentCell.x, myY:currentCell.y, theirX:neighbor.x, theirY:neighbor.y });
-                            } else {
-                                if(!mostNeededTroops.found || (!mostNeededTroops.againstPlayer || mostNeededTroops.num < neighbor.units - currentCell.units)) {
-                                    mostNeededTroops = { found:true, againstPlayer:true, num:neighbor.units - currentCell.units, x:currentCell.x, y:currentCell.y };
-                                }
-                            }
-                        } else if(neighbor.controllingPlayer !== currentCell.controllingPlayer) {
-                            //this neighbor is neutral
-                            if(neighbor.units < currentCell.units) {
-                                possibleNeutralAttacks.push({ myX:currentCell.x, myY:currentCell.y, theirX:neighbor.x, theirY:neighbor.y });
-                            } else {
-                                if(!mostNeededTroops.found || (!mostNeededTroops.againstPlayer && mostNeededTroops.num < neighbor.units - currentCell.units)) { 
-                                    mostNeededTroops = { found:true, againstPlayer:false, num:neighbor.units - currentCell.units, x:currentCell.x, y:currentCell.y };
-                                }
-                            }
-                        }
-                    });
-                }
-            }
+    //spawn timer for new units
+    StartSpawning();
 
-            if(possiblePlayerAttacks.length > 0) {
-                let attack = possiblePlayerAttacks[Math.floor(Math.random() * possiblePlayerAttacks.length)];
-                grid[attack.theirX][attack.theirY].getAttacked(grid[attack.myX][attack.myY]);
-            } else if(possibleNeutralAttacks.length > 0) {
-                let attack = possibleNeutralAttacks[Math.floor(Math.random() * possiblePlayerAttacks.length)];
-                grid[attack.theirX][attack.theirY].getAttacked(grid[attack.myX][attack.myY]);
-            } else if(mostNeededTroops.found) {
-                let index = -1;
-                let max = -1;
-                for(let i = 0; i < playerCells[plyr].length; i++) {
-                    if(!playerCells[plyr][i].outer) {
-                        let count = playerCells[plyr][i].units;
-                        if(count > max) {
-                            max = count;
-                            index = i;
-                        }
-                    }
-                }
-                if(index >= 0) {
-                    grid[mostNeededTroops.x][mostNeededTroops.y].getUnitsFrom(playerCells[plyr][index], Math.ceil(playerCells[plyr][index].units / 2));
-                }
-            }
+    //AI logic
+    //set off each player's timer and store them
+    players.forEach(player => {
+        const timer = player.getAILogic();
+        if(timer) {
+            AITimers.push(timer);
         }
-    }
-},2000);
+    });
 
-gameRunning = true;
+    gameRunning = true;
+}
+
+//initialize spawnTimer to loop spawning units
+function StartSpawning() {
+    spawnTimer = setInterval(()=>{
+        grid.forEach(row => {
+            row.forEach(cell => {
+                if(cell.controllingPlayer !== 0) {
+                    cell.spawn();
+                }
+            });
+        });
+    },5000);
+}
+
+//pauses or unpauses timers and inputs
+function TogglePause() {
+    if(!gameRunning && grid.length) {
+        //unpause
+        gameRunning = true;
+        AITimers = [];
+        players.forEach(player => {
+            const timer = player.getAILogic();
+            if(timer) {
+                AITimers.push(timer);
+            }
+        });
+        StartSpawning();
+        document.querySelector('#pausebutton').textContent = 'Pause';
+    } else if(gameRunning) {
+        //pause
+        gameRunning = false;
+        StopSelecting();
+        AITimers.forEach(timer => {
+            clearInterval(timer);
+        }); 
+        AITimers = [];
+        clearInterval(spawnTimer);
+        spawnTimer = 0;
+        document.querySelector('#pausebutton').textContent = 'Unpause';
+    }
+}
 
 //function that disposes select mode
 function StopSelecting() {
@@ -350,7 +480,12 @@ function StopSelecting() {
 //end timers and handle game ending
 function EndGame(winningPlayerNumber) {
     clearInterval(spawnTimer);
-    clearInterval(AITimer);
+    AITimers.forEach(timer => {
+        clearInterval(timer);
+    });
+    AITimers = [];
+
+    grid = [];
 
     gameRunning = false;
 
@@ -359,3 +494,4 @@ function EndGame(winningPlayerNumber) {
     }
 }
 
+StartGame();
