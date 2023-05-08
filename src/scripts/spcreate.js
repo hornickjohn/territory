@@ -15,7 +15,6 @@ class Player {
         } else if(this.difficulty === "neutral") {
             return;
         }
-
         grid[this.startingCell.x][this.startingCell.y].setToPlayer(this.num);
         grid[this.startingCell.x][this.startingCell.y].units = 0;
         grid[this.startingCell.x][this.startingCell.y].addUnits(this.startingUnits);
@@ -109,36 +108,45 @@ let AITimers = [];
 let grid = [];
 
 const maxPerCell = 999;
-const dimension = 7;
-let startingCells = [{x:0,y:0},{x:dimension-1,y:0},{x:0,y:dimension-1},{x:dimension-1,y:dimension-1}];
-const randomizeStartingLocations = true;
-const startingUnits = 30;
-const initialSpawnRanges = [{min:10,max:40},{min:20,max:50},{min:30,max:80},{min:50,max:125},{min:75,max:150},{min:100,max:250}]; //longest range is theoretically d-2 for d is even, d-1 for d is odd
-const symmetry = true;
+let dimension = 15;
+const relativeStartingCells = [{x:1,y:1},{x:-1,y:1},{x:1,y:-1},{x:-1,y:-1}];
+let startingCells = [];
+let randomizeStartingLocations = true;
+let startingUnits = 30;
+let initialSpawnRanges = [{min:10,max:40},{min:20,max:50},{min:30,max:80},{min:50,max:125},{min:75,max:150},{min:100,max:250}]; //longest range is theoretically d-2 for d is even, d-1 for d is odd
+let symmetry = true;
 
-//create player objects based on info
-if(randomizeStartingLocations) { ShuffleStartingCells(); }
-function ShuffleStartingCells() {
-    let rv = [];
-    while(startingCells.length > 0) {
-        const ind = Math.floor(Math.random() * startingCells.length);
-        rv.push(startingCells[ind]);
-        startingCells.splice(ind, 1);
-    }
-    startingCells = rv;
+let spawnRanges = initialSpawnRanges.map(val => val);
+
+function InitializeStartingCells() {
+    startingCells = relativeStartingCells.map(relativePosition => {
+        let x = 0;
+        if(relativePosition.x > 0 && relativePosition.x <= dimension) {
+            x = relativePosition.x - 1;
+        } else if(relativePosition.x < 0 && relativePosition.x >= dimension * -1) {
+            x = dimension + relativePosition.x;
+        } else {
+            throw new Error('Relative starting position \'x\' invalid.');
+        }
+
+        let y = 0;
+        if(relativePosition.y > 0 && relativePosition.y <= dimension) {
+            y = relativePosition.y - 1;
+        } else if(relativePosition.y < 0 && relativePosition.y >= dimension * -1) {
+            y = dimension + relativePosition.y;
+        } else {
+            throw new Error('Relative starting position \'y\' invalid.');
+        }
+
+        return {x,y};
+    });
 }
-const players = [new Player(0, "neutral", null, null)];
-players.push(new Player(1, "player", startingCells[0], startingUnits));
-for(let i = 1; i < startingCells.length; i++) {
-    players.push(new Player(i+1, "easy", startingCells[i], startingUnits));
-};
-
-const playerCells = [[]];
-for(let i = 0; i < startingCells.length; i++) { playerCells.push([]); }
 
 let selectingCell = null;
 let attackableCells = [];
 let movableCells = [];
+let players = [];
+let playerCells = [[]];
 
 class Cell {
     constructor(domCell, controllingPlayer, x, y) {
@@ -340,6 +348,35 @@ function StartGame() {
     //Click anywhere on page leaves selecting mode
     document.querySelector('body').onclick += e => { StopSelecting(); }
 
+    document.querySelector('#pausebutton').style.display = "initial";
+
+    InitializeStartingCells();
+
+    //create player objects based on info
+    if(randomizeStartingLocations) { ShuffleStartingCells(); }
+    function ShuffleStartingCells() {
+        let rv = [];
+        while(startingCells.length > 0) {
+            const ind = Math.floor(Math.random() * startingCells.length);
+            rv.push(startingCells[ind]);
+            startingCells.splice(ind, 1);
+        }
+        startingCells = rv;
+    }
+    players = [new Player(0, "neutral", null, null)];
+    for(let i = 0; i < startingCells.length; i++) {
+        let diff = 'easy';
+        if(playerNum === i+1) {
+            diff = 'player';
+        }
+        players.push(new Player(i+1, diff, startingCells[i], startingUnits));
+    };
+
+    //initialize arrays of each player's cells
+    playerCells = [[]];
+    for(let i = 0; i < startingCells.length; i++) { playerCells.push([]); }
+
+    //new grid
     grid = [];
     for(let i = 0; i < dimension; i++) { grid.push([]); }
 
@@ -366,7 +403,7 @@ function StartGame() {
             }
 
             //figure out distance to nearest player cell
-            let minDist = initialSpawnRanges.length;
+            let minDist = spawnRanges.length;
             players.forEach(player => {
                 if(player.difficulty !== "neutral") {
                     const dist = Math.abs(player.startingCell.x - cell.x) + Math.abs(player.startingCell.y - cell.y);
@@ -376,7 +413,7 @@ function StartGame() {
 
             //initialize neutrals based on that
             if(minDist > 0) {
-                const range = initialSpawnRanges[minDist - 1];
+                const range = spawnRanges[minDist - 1];
                 cell.units = 0;
                 cell.addUnits(range.min + Math.floor(Math.random() * ((range.max - range.min) + 1)));
             }
@@ -419,6 +456,51 @@ function StartGame() {
     });
 
     gameRunning = true;
+}
+
+function GameStartFormSubmit(e) {
+    e.preventDefault();
+    dimension = Number(e.target.elements.dimension.value);
+    randomizeStartingLocations = e.target.elements.randomize.checked;
+    playerNum = Number(e.target.elements.playernum.value);
+    startingUnits = Number(e.target.elements.startingunits.value);
+    symmetry = e.target.elements.symmetry.checked;
+
+    spawnRanges = initialSpawnRanges.map(val => val);
+    let mult = 1.0;
+    switch(e.target.spawnheaviness.value) {
+        case 'vl':
+            mult = 0.2;
+            break;
+        case 'l':
+            mult = 0.5;
+            break;
+        case 'h':
+            mult = 2.0;
+            break;
+        case 'vh':
+            mult = 5.0;
+            break;
+        default:
+            break;
+    }
+    spawnRanges.forEach(range => {
+        range.min = Math.floor(range.min * mult);
+        range.max = Math.floor(range.max * mult);
+    });
+
+    //store settings in localstorage so they are kept for future sessions
+    localStorage.setItem('territory_sp_settings',JSON.stringify({
+        dimension,
+        randomizeStartingLocations,
+        playerNum,
+        startingUnits,
+        symmetry,
+        spawnheaviness:e.target.spawnheaviness.value
+    }));
+
+    e.target.style.display = 'none';
+    StartGame();
 }
 
 //initialize spawnTimer to loop spawning units
@@ -492,6 +574,32 @@ function EndGame(winningPlayerNumber) {
     if(winningPlayerNumber) {
         console.log('Player ' + winningPlayerNumber + ' won!');
     }
+
+    document.querySelector('#pausebutton').style.display = "none";
+    document.querySelector('#newgamebutton').style.display = "initial";
 }
 
-StartGame();
+//sets settings form values to saved settings
+function LoadSettings() {
+    const settings = JSON.parse(localStorage.getItem('territory_sp_settings'));
+    if(settings) {
+        if(settings.dimension) {
+            document.querySelector('#dimension').value = settings.dimension;
+        }
+        document.querySelector('#randomizecheckbox').checked = settings.randomizeStartingLocations;
+        if(settings.playerNum) {
+            document.querySelector('#playernum').value = settings.playerNum;
+            document.querySelector('#playernum').onchange();
+        }
+        if(settings.startingUnits) {
+            document.querySelector('#startingunits').value = settings.startingUnits;
+        }
+        document.querySelector('#symmetrycheckbox').checked = settings.symmetry;
+        if(settings.spawnheaviness) {
+            document.querySelector('#spawnheaviness').value = settings.spawnheaviness;
+        }
+    }
+}
+
+document.querySelector('#gameoptions').onsubmit = GameStartFormSubmit;
+LoadSettings();

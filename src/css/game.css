@@ -1,6 +1,9 @@
 :root {
     --maxwidth:480px;
-
+    --player1color:blue;
+    --player2color:red;
+    --player3color:green;
+    --player4color:yellow;
 }
 
 #gamearea table {
@@ -12,22 +15,23 @@
 #gamearea td {
     border:3px solid black;
     text-align:center;
+    user-select:none;
 }
 
 .player0cell {
     background-color:gray;
 }
 .player1cell {
-    background-color:blue;
+    background-color:var(--player1color);
 }
 .player2cell {
-    background-color:red;
+    background-color:var(--player2color);
 }
 .player3cell {
-    background-color:green;
+    background-color:var(--player3color);
 }
 .player4cell {
-    background-color:yellow;
+    background-color:var(--player4color);
 }
 
 .selected {
@@ -47,4 +51,46 @@
 .attackable:hover {
     filter:brightness(160%);
     cursor:crosshair;
+}
+
+form {
+    padding:15px;
+    margin:15px;
+    border:3px solid chartreuse;
+    border-radius:20px;
+    max-width:300px;
+}
+form > * {
+    margin:5px;
+}
+.centercontent {
+    text-align:center;
+}
+
+#playernum {
+    width:100px;
+}
+.player1select {
+    background-color:var(--player1color);
+}
+.player2select {
+    background-color:var(--player2color);
+}
+.player3select {
+    background-color:var(--player3color);
+}
+.player4select {
+    background-color:var(--player4color);
+}
+.player1option {
+    background-color:var(--player1color);
+}
+.player2option {
+    background-color:var(--player2color);
+}
+.player3option {
+    background-color:var(--player3color);
+}
+.player4option {
+    background-color:var(--player4color);
 }

@@ -13,10 +13,62 @@
 
     </header>
     <main>
+        <!-- Div where the grid is programmatically inserted -->
         <div id="gamearea">
             
         </div>
-        <button id="pausebutton" onclick="TogglePause()">Pause</button>
+
+        <!-- Form to select options and start a new game -->
+        <form id="gameoptions">
+            <label for='dimension'>Size of Grid</label>
+            <select id='dimension' name='dimension'>
+                <option>3</option>
+                <option>4</option>
+                <option>5</option>
+                <option>6</option>
+                <option>7</option>
+                <option>8</option>
+                <option>9</option>
+                <option selected>10</option>
+                <option>11</option>
+                <option>12</option>
+                <option>13</option>
+                <option>14</option>
+                <option>15</option>
+            </select>
+            <br>
+            <label for='playernum'>Play As</label>
+            <select onchange="this.classList.remove('player1select','player2select','player3select','player4select'); this.classList.add('player' + this.value + 'select');" id='playernum' name='playernum' class='player1select'>
+                <option value='1' class='player1option' selected></option>
+                <option value='2' class='player2option'></option>
+                <option value='3' class='player3option'></option>
+                <option value='4' class='player4option'></option>
+            </select>
+            <br>
+            <label for='randomizecheckbox'>Randomize Player Corners</label>
+            <input type='checkbox' id='randomizecheckbox' name='randomize' checked />
+            <br>
+            <label for='startingunits'>Starting Units</label>
+            <input id='startingunits' value='30' name='startingunits' type='number' min='0' max='999' />
+            <br>
+            <label for='spawnheaviness'>Spawn Heaviness</label>
+            <select id='spawnheaviness' name='spawnheaviness'>
+                <option value='vl'>Very Light</option>
+                <option value='l'>Light</option>
+                <option value='n' selected>Normal</option>
+                <option value='h'>Heavy</option>
+                <option value='vh'>Very Heavy</option>
+            </select>
+            <br>
+            <label for='symmetrycheckbox'>Symmetrical Neutral Spawns</label>
+            <input type='checkbox' id='symmetrycheckbox' name='symmetry' checked />
+            <br>
+            <div class="centercontent"><button>Start</button></div>
+        </form>
+
+        <!-- Buttons -->
+        <button id="pausebutton" onclick="TogglePause()" style="display:none;">Pause</button>
+        <button id="newgamebutton" onclick="document.querySelector('#gamearea').innerHTML = ''; document.querySelector('#gameoptions').style.display = 'inherit'; this.style.display='none';" style="display:none;">New Game</button>
     </main>
     <footer>
         
