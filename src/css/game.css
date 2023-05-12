@@ -1,16 +1,23 @@
 :root {
-    --maxwidth:480px;
+    --size:480px;
     --player1color:blue;
     --player2color:red;
     --player3color:green;
     --player4color:yellow;
 }
 
+main {
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    padding-top:10px;
+}
 #gamearea table {
-    width:var(--maxwidth);
-    height:var(--maxwidth);
+    width:var(--size);
+    height:var(--size);
     border-collapse:collapse;
     table-layout:fixed;
+    /* margin:0 5000px; */
 }
 #gamearea td {
     border:3px solid black;

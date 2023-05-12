@@ -17,6 +17,7 @@
         <div id="gamearea">
             
         </div>
+        <br>
 
         <!-- Form to select options and start a new game -->
         <form id="gameoptions">
@@ -63,12 +64,13 @@
             <label for='symmetrycheckbox'>Symmetrical Neutral Spawns</label>
             <input type='checkbox' id='symmetrycheckbox' name='symmetry' checked />
             <br>
-            <div class="centercontent"><button>Start</button></div>
+            <div class="centercontent"><Button>Start</Button></div>
+            <!-- <div class="centercontent"><input type="submit" value="Start" /></div> -->
         </form>
 
         <!-- Buttons -->
         <button id="pausebutton" onclick="TogglePause()" style="display:none;">Pause</button>
-        <button id="newgamebutton" onclick="document.querySelector('#gamearea').innerHTML = ''; document.querySelector('#gameoptions').style.display = 'inherit'; this.style.display='none';" style="display:none;">New Game</button>
+        <button id="newgamebutton" onclick="document.querySelector('#gamearea').innerHTML = ''; document.querySelector('#gameoptions').style.display = 'initial'; this.style.display='none';" style="display:none;">New Game</button>
     </main>
     <footer>
         

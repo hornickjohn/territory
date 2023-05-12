@@ -116,7 +116,7 @@ let startingUnits = 30;
 let initialSpawnRanges = [{min:10,max:40},{min:20,max:50},{min:30,max:80},{min:50,max:125},{min:75,max:150},{min:100,max:250}]; //longest range is theoretically d-2 for d is even, d-1 for d is odd
 let symmetry = true;
 
-let spawnRanges = initialSpawnRanges.map(val => val);
+let spawnRanges;
 
 function InitializeStartingCells() {
     startingCells = relativeStartingCells.map(relativePosition => {
@@ -466,7 +466,6 @@ function GameStartFormSubmit(e) {
     startingUnits = Number(e.target.elements.startingunits.value);
     symmetry = e.target.elements.symmetry.checked;
 
-    spawnRanges = initialSpawnRanges.map(val => val);
     let mult = 1.0;
     switch(e.target.spawnheaviness.value) {
         case 'vl':
@@ -484,9 +483,8 @@ function GameStartFormSubmit(e) {
         default:
             break;
     }
-    spawnRanges.forEach(range => {
-        range.min = Math.floor(range.min * mult);
-        range.max = Math.floor(range.max * mult);
+    spawnRanges = initialSpawnRanges.map(val => {
+        return {min:Math.floor(val.min * mult),max:Math.floor(val.max * mult)};
     });
 
     //store settings in localstorage so they are kept for future sessions
@@ -601,5 +599,6 @@ function LoadSettings() {
     }
 }
 
+//run at page load
 document.querySelector('#gameoptions').onsubmit = GameStartFormSubmit;
 LoadSettings();
